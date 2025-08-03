@@ -74,6 +74,9 @@
 			<version>${aws.sdk.version}</version>
 		</dependency>
 
+
+
+
 		<!-- Dotenv para cargar variables de entorno -->
 		<dependency>
 			<groupId>me.paulschwarz</groupId>

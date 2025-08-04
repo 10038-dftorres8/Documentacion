@@ -16,4 +16,6 @@ public interface DocumentoAdjuntoRepository extends MongoRepository<DocumentoAdj
     boolean existsByNumeroSolicitudAndTipoDocumento(String numeroSolicitud, String tipoDocumento);
     
     void deleteByNumeroSolicitud(String numeroSolicitud);
+
+    long countByNumeroSolicitud(String numeroSolicitud);
 } 

@@ -5,6 +5,8 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 
+import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -15,4 +17,5 @@ public class DocumentoAdjuntoDTO {
     private String rutaStorage;
     private LocalDateTime fechaCarga;
     private Long version;
-} 
+    private EstadoDocumentoEnum estado;
+}

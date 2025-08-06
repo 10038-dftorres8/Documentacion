@@ -1,6 +1,10 @@
 package com.banquito.Documentacion.controller;
 
+import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
+import com.banquito.Documentacion.dto.RechazoDocumentoRequestDTO;
+import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
+import com.banquito.Documentacion.model.DocumentoAdjunto;
 import com.banquito.Documentacion.service.DocumentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -9,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -18,6 +23,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.banquito.Documentacion.repository.DocumentoAdjuntoRepository;
+import com.banquito.Documentacion.client.OriginacionClient;
 
 import java.util.List;
 
@@ -29,29 +36,36 @@ import java.util.List;
 public class DocumentoController {
 
     private final DocumentoService documentoService;
+    private final DocumentoAdjuntoRepository documentoAdjuntoRepository;
+    private final OriginacionClient originacionClient;
 
-    @Operation(summary = "Cargar documento a solicitud", 
-               description = "Sube y valida un documento PDF para la solicitud (máximo 20MB). Tipos válidos: CEDULA_IDENTIDAD, ROL_PAGOS, ESTADO_CUENTA_BANCARIA")
+    @Operation(summary = "Cargar documento a solicitud", description = "Sube y valida un documento PDF para la solicitud (máximo 20MB). Tipos válidos: CEDULA_IDENTIDAD, ROL_PAGOS, ESTADO_CUENTA_BANCARIA")
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Documento cargado exitosamente", content = @Content(schema = @Schema(implementation = DocumentoAdjuntoResponseDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Archivo inválido", content = @Content),
-        @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
+            @ApiResponse(responseCode = "201", description = "Documento cargado exitosamente", content = @Content(schema = @Schema(implementation = DocumentoAdjuntoResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Archivo inválido", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
     })
+
     @PostMapping
     public ResponseEntity<DocumentoAdjuntoResponseDTO> cargarDocumento(
-            @Parameter(description = "Número de la solicitud", required = true) @PathVariable String numeroSolicitud,
-            @Parameter(description = "Archivo PDF a cargar", required = true) @RequestParam("archivo") MultipartFile archivo,
-            @Parameter(description = "Tipo de documento", required = true) @RequestParam("tipoDocumento") String tipoDocumento) {
-        log.info("Cargando documento '{}' para solicitud {}", tipoDocumento, numeroSolicitud);
-        DocumentoAdjuntoResponseDTO response = documentoService.cargarDocumento(numeroSolicitud, archivo, tipoDocumento);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            @PathVariable String numeroSolicitud,
+            @RequestParam("archivo") MultipartFile archivo,
+            @RequestParam("tipoDocumento") String tipoDocumento) {
+        // 1) sube el doc
+        var dto = documentoService.cargarDocumento(numeroSolicitud, archivo, tipoDocumento);
+
+        // si ya subimos el tercer documento, avisamos al service
+        if (documentoService.countPorSolicitud(numeroSolicitud) == 3) {
+            documentoService.notificarDocumentacionCargada(numeroSolicitud);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
-    @Operation(summary = "Descargar documento", 
-               description = "Descarga un documento específico de la solicitud")
+    @Operation(summary = "Descargar documento", description = "Descarga un documento específico de la solicitud")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Documento descargado exitosamente"),
-        @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
+            @ApiResponse(responseCode = "200", description = "Documento descargado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
     })
     @GetMapping("/{idDocumento}/descargar")
     public ResponseEntity<Resource> descargarDocumento(
@@ -65,11 +79,10 @@ public class DocumentoController {
                 .body(resource);
     }
 
-    @Operation(summary = "Ver documento", 
-               description = "Visualiza un documento específico de la solicitud en el navegador")
+    @Operation(summary = "Ver documento", description = "Visualiza un documento específico de la solicitud en el navegador")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Documento visualizado exitosamente"),
-        @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
+            @ApiResponse(responseCode = "200", description = "Documento visualizado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
     })
     @GetMapping("/{idDocumento}/ver")
     public ResponseEntity<Resource> verDocumento(
@@ -82,11 +95,10 @@ public class DocumentoController {
                 .body(resource);
     }
 
-    @Operation(summary = "Listar documentos de solicitud", 
-               description = "Obtiene la lista de documentos cargados para una solicitud")
+    @Operation(summary = "Listar documentos de solicitud", description = "Obtiene la lista de documentos cargados para una solicitud")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Lista obtenida exitosamente"),
-        @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
+            @ApiResponse(responseCode = "200", description = "Lista obtenida exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
     })
     @GetMapping
     public ResponseEntity<List<DocumentoAdjuntoResponseDTO>> listarDocumentos(
@@ -96,11 +108,10 @@ public class DocumentoController {
         return ResponseEntity.ok(documentos);
     }
 
-    @Operation(summary = "Eliminar documento", 
-               description = "Elimina un documento específico de la solicitud")
+    @Operation(summary = "Eliminar documento", description = "Elimina un documento específico de la solicitud")
     @ApiResponses({
-        @ApiResponse(responseCode = "204", description = "Documento eliminado exitosamente"),
-        @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
+            @ApiResponse(responseCode = "204", description = "Documento eliminado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
     })
     @DeleteMapping("/{idDocumento}")
     public ResponseEntity<Void> eliminarDocumento(
@@ -111,11 +122,73 @@ public class DocumentoController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Eliminar todos los documentos de una solicitud", 
-               description = "Elimina todos los documentos asociados a una solicitud")
+    @Operation(summary = "Validar documento", description = "Marca un documento como validado")
     @ApiResponses({
-        @ApiResponse(responseCode = "204", description = "Documentos eliminados exitosamente"),
-        @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
+            @ApiResponse(responseCode = "200", description = "Documento validado exitosamente", content = @Content(schema = @Schema(implementation = DocumentoAdjuntoResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
+    })
+    @PatchMapping("/{idDocumento}/validar")
+    public ResponseEntity<DocumentoAdjuntoResponseDTO> validarDocumento(
+            @PathVariable String numeroSolicitud,
+            @PathVariable String idDocumento) {
+        DocumentoAdjuntoResponseDTO dto = documentoService.validarDocumento(numeroSolicitud, idDocumento);
+        return ResponseEntity.ok(dto);
+    }
+
+    @Operation(summary = "Validar todos los documentos de una solicitud", description = "Marca todos los documentos de una solicitud como validados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Todos los documentos validados exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
+    })
+
+    @PatchMapping("/validar-todos")
+    public ResponseEntity<Void> validarTodos(
+            @PathVariable String numeroSolicitud,
+            @RequestParam String usuario) {
+        // 1) Carga todos los documentos
+        List<DocumentoAdjunto> docs = documentoAdjuntoRepository.findByNumeroSolicitud(numeroSolicitud);
+        boolean anyRejected = docs.stream()
+                .anyMatch(d -> d.getEstado() == EstadoDocumentoEnum.RECHAZADO);
+
+        // 2) Marca como VALIDADO los que aún estén CARGADO
+        docs.stream()
+                .filter(d -> d.getEstado() == EstadoDocumentoEnum.CARGADO)
+                .forEach(d -> d.setEstado(EstadoDocumentoEnum.VALIDADO));
+        documentoAdjuntoRepository.saveAll(docs);
+
+        // 3) Notifica a Originación sólo una vez
+        DetalleSolicitudResponseDTO det = originacionClient.obtenerDetalle(numeroSolicitud);
+        String nuevoEstado = anyRejected ? "DOCUMENTACION_RECHAZADA" : "DOCUMENTACION_VALIDADA";
+        String motivo = anyRejected
+                ? "Uno o más documentos fueron rechazados"
+                : "Todos los documentos validados";
+        originacionClient.cambiarEstado(
+                det.getIdSolicitud(), nuevoEstado, motivo, usuario);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Rechazar documento", description = "Marca un documento como rechazado con una observación obligatoria")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Documento rechazado exitosamente", content = @Content(schema = @Schema(implementation = DocumentoAdjuntoResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Observación inválida", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Documento no encontrado", content = @Content)
+    })
+    @PatchMapping("/{idDocumento}/rechazar")
+    public ResponseEntity<DocumentoAdjuntoResponseDTO> rechazarDocumento(
+            @PathVariable String numeroSolicitud,
+            @PathVariable String idDocumento,
+            @Valid @RequestBody RechazoDocumentoRequestDTO solicitud) {
+        // Aquí recibimos la observación desde el cuerpo de la petición
+        DocumentoAdjuntoResponseDTO dto = documentoService.rechazarDocumento(numeroSolicitud, idDocumento,
+                solicitud.getObservacion());
+        return ResponseEntity.ok(dto);
+    }
+
+    @Operation(summary = "Eliminar todos los documentos de una solicitud", description = "Elimina todos los documentos asociados a una solicitud")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Documentos eliminados exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Solicitud no encontrada", content = @Content)
     })
     @DeleteMapping
     public ResponseEntity<Void> eliminarDocumentosPorSolicitud(
@@ -124,4 +197,24 @@ public class DocumentoController {
         documentoService.eliminarDocumentosPorSolicitud(numeroSolicitud);
         return ResponseEntity.noContent().build();
     }
-} 
+
+    // DocumentoController.java
+
+    @PatchMapping("/validar-contratos")
+    public ResponseEntity<Void> validarContratos(
+            @PathVariable String numeroSolicitud,
+            @RequestParam String usuario) {
+        documentoService.validarTodosContratos(numeroSolicitud, usuario);
+        return ResponseEntity.ok().build();
+    }
+
+    // en DocumentoController.java
+    @PatchMapping("/contratos-cargados")
+    public ResponseEntity<Void> contratosCargados(
+            @PathVariable String numeroSolicitud,
+            @RequestParam String usuario) {
+        documentoService.notificarContratoCargado(numeroSolicitud, usuario);
+        return ResponseEntity.ok().build();
+    }
+
+}

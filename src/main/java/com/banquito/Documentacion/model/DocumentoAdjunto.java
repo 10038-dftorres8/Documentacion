@@ -7,6 +7,9 @@ import lombok.ToString;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
+
+import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
+
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
@@ -43,6 +46,12 @@ public class DocumentoAdjunto {
     @LastModifiedDate
     private LocalDateTime fechaActualizacion;
 
+    @Field("estado")
+    private EstadoDocumentoEnum estado = EstadoDocumentoEnum.CARGADO;
+
+    @Field("observacion")
+    private String observacion;
+
     @Field("version")
     private Long version;
 
@@ -52,8 +61,10 @@ public class DocumentoAdjunto {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
+        if (this == obj)
+            return true;
+        if (obj == null || getClass() != obj.getClass())
+            return false;
         DocumentoAdjunto that = (DocumentoAdjunto) obj;
         return Objects.equals(id, that.id);
     }
@@ -62,4 +73,4 @@ public class DocumentoAdjunto {
     public int hashCode() {
         return Objects.hash(id);
     }
-} 
+}

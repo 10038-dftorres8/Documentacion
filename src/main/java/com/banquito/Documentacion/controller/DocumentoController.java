@@ -198,31 +198,13 @@ public class DocumentoController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/documentos/contratos/validar-todos")
-    public ResponseEntity<Void> validarTodosContratos(
+    // DocumentoController.java
+
+    @PatchMapping("/validar-contratos")
+    public ResponseEntity<Void> validarContratos(
             @PathVariable String numeroSolicitud,
             @RequestParam String usuario) {
-        List<DocumentoAdjunto> docs = documentoAdjuntoRepository.findByNumeroSolicitud(numeroSolicitud).stream()
-                .filter(d -> d.getTipoDocumento().equals("CONTRATO")
-                        || d.getTipoDocumento().equals("PAGARES"))
-                .toList();
-
-        boolean anyRejected = docs.stream()
-                .anyMatch(d -> d.getEstado() == EstadoDocumentoEnum.RECHAZADO);
-
-        docs.stream()
-                .filter(d -> d.getEstado() == EstadoDocumentoEnum.CARGADO)
-                .forEach(d -> d.setEstado(EstadoDocumentoEnum.VALIDADO));
-
-        documentoAdjuntoRepository.saveAll(docs);
-
-        DetalleSolicitudResponseDTO det = originacionClient.obtenerDetalle(numeroSolicitud);
-        String nuevoEstado = anyRejected ? "CONTRATO_RECHAZADO" : "CONTRATO_VALIDADO";
-        String motivo = anyRejected
-                ? "Uno o más contratos fueron rechazados"
-                : "Todos los contratos validados";
-
-        originacionClient.cambiarEstado(det.getIdSolicitud(), nuevoEstado, motivo, usuario);
+        documentoService.validarTodosContratos(numeroSolicitud, usuario);
         return ResponseEntity.ok().build();
     }
 

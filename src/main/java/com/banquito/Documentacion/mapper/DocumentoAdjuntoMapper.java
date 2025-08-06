@@ -6,6 +6,7 @@ import com.banquito.Documentacion.model.DocumentoAdjunto;
 import org.mapstruct.Mapper;
 
 
+
 @Mapper(componentModel = "spring")
 public interface DocumentoAdjuntoMapper {
     DocumentoAdjunto toEntity(DocumentoAdjuntoDTO dto);

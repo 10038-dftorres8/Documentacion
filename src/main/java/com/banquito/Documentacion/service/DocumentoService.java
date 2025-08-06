@@ -1,6 +1,11 @@
 package com.banquito.Documentacion.service;
 
+import com.banquito.Documentacion.client.CoreBancarioClient;
+import com.banquito.Documentacion.client.ClientesClient;
+import com.banquito.Documentacion.client.PrestamoClient;
 import com.banquito.Documentacion.client.OriginacionClient;
+import com.banquito.Documentacion.dto.ClienteDTO;
+import com.banquito.Documentacion.dto.CrearPrestamoRequest;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
@@ -33,6 +38,10 @@ public class DocumentoService {
     private final DocumentoAdjuntoMapper documentoAdjuntoMapper;
     private final FileStorageService fileStorageService;
     private final OriginacionClient originacionClient;
+
+    private final CoreBancarioClient coreBancarioClient;
+    private final PrestamoClient prestamoClient;
+    private final ClientesClient clientesClient;
 
     /** nuevo método: contar cuántos hay */
     public long countPorSolicitud(String numeroSolicitud) {
@@ -157,13 +166,35 @@ public class DocumentoService {
                 documentoAdjuntoRepository.save(d);
             }
         });
-        // 2) notificar a Originación que ya validó TODO
+        // 2) notificar a Originación que ya validó TODOS los documentos
         DetalleSolicitudResponseDTO det = originacionClient.obtenerDetalle(numeroSolicitud);
         originacionClient.cambiarEstado(
                 det.getIdSolicitud(),
                 "DOCUMENTACION_VALIDADA",
                 "Se validaron todos los documentos",
                 usuario);
+
+        // a) obtener idCliente
+        coreBancarioClient
+                .consultarPersonaPorIdentificacion("CEDULA", det.getCedulaSolicitante());
+
+        // (3b) Recupera el cliente ya creado en el micro de Clientes
+        List<ClienteDTO> clientes = clientesClient
+                .findByIdentificacion("CEDULA", det.getCedulaSolicitante());
+        if (clientes.isEmpty()) {
+            throw new IllegalStateException("No existe cliente con esta cédula " + det.getCedulaSolicitante());
+        }
+        String idCliente = clientes.get(0).getId();
+
+        // b) construir request
+        CrearPrestamoRequest creq = new CrearPrestamoRequest(
+                idCliente,
+                det.getIdPrestamo(),
+                det.getMontoSolicitado(),
+                det.getPlazoMeses());
+
+        // c) llamas al cliente Feign que expone el POST /prestamos
+        prestamoClient.crearPrestamo(creq);
     }
 
     public void cargarTodosYMarcar(

@@ -16,12 +16,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -53,7 +49,8 @@ public class FileStorageService {
     public void initializeS3() {
         // Validar que las credenciales de AWS estén configuradas
         if (accessKeyId == null || accessKeyId.isEmpty() || secretAccessKey == null || secretAccessKey.isEmpty()) {
-            throw new RuntimeException("Credenciales de AWS S3 no configuradas. Es obligatorio configurar AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY");
+            throw new RuntimeException(
+                    "Credenciales de AWS S3 no configuradas. Es obligatorio configurar AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY");
         }
 
         try {
@@ -62,7 +59,8 @@ public class FileStorageService {
             log.info("S3 client inicializado exitosamente para bucket: {}", bucketName);
         } catch (Exception e) {
             log.error("Error al inicializar S3 client: {}", e.getMessage());
-            throw new RuntimeException("No se pudo inicializar S3 client. Verifique las credenciales y configuración de AWS", e);
+            throw new RuntimeException(
+                    "No se pudo inicializar S3 client. Verifique las credenciales y configuración de AWS", e);
         }
     }
 
@@ -70,7 +68,8 @@ public class FileStorageService {
         S3ClientBuilder builder = S3Client.builder()
                 .region(software.amazon.awssdk.regions.Region.of(region));
 
-        builder.credentialsProvider(() -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+        builder.credentialsProvider(
+                () -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKeyId, secretAccessKey));
 
         if (endpointUrl != null && !endpointUrl.isEmpty()) {
             builder.endpointOverride(java.net.URI.create(endpointUrl));
@@ -83,7 +82,8 @@ public class FileStorageService {
         S3Presigner.Builder builder = S3Presigner.builder()
                 .region(software.amazon.awssdk.regions.Region.of(region));
 
-        builder.credentialsProvider(() -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+        builder.credentialsProvider(
+                () -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKeyId, secretAccessKey));
 
         if (endpointUrl != null && !endpointUrl.isEmpty()) {
             builder.endpointOverride(java.net.URI.create(endpointUrl));
@@ -180,4 +180,4 @@ public class FileStorageService {
             log.warn("Error al cerrar recursos de S3: {}", e.getMessage());
         }
     }
-} 
+}

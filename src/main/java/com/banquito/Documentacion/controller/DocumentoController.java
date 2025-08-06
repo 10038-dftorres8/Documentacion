@@ -1,10 +1,7 @@
 package com.banquito.Documentacion.controller;
 
-import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
 import com.banquito.Documentacion.dto.RechazoDocumentoRequestDTO;
-import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
-import com.banquito.Documentacion.model.DocumentoAdjunto;
 import com.banquito.Documentacion.service.DocumentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,8 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import com.banquito.Documentacion.repository.DocumentoAdjuntoRepository;
-import com.banquito.Documentacion.client.OriginacionClient;
+
 
 import java.util.List;
 
@@ -36,8 +32,7 @@ import java.util.List;
 public class DocumentoController {
 
     private final DocumentoService documentoService;
-    private final DocumentoAdjuntoRepository documentoAdjuntoRepository;
-    private final OriginacionClient originacionClient;
+
 
     @Operation(summary = "Cargar documento a solicitud", description = "Sube y valida un documento PDF para la solicitud (máximo 20MB). Tipos válidos: CEDULA_IDENTIDAD, ROL_PAGOS, ESTADO_CUENTA_BANCARIA")
     @ApiResponses({
@@ -145,25 +140,9 @@ public class DocumentoController {
     public ResponseEntity<Void> validarTodos(
             @PathVariable String numeroSolicitud,
             @RequestParam String usuario) {
-        // 1) Carga todos los documentos
-        List<DocumentoAdjunto> docs = documentoAdjuntoRepository.findByNumeroSolicitud(numeroSolicitud);
-        boolean anyRejected = docs.stream()
-                .anyMatch(d -> d.getEstado() == EstadoDocumentoEnum.RECHAZADO);
+       
 
-        // 2) Marca como VALIDADO los que aún estén CARGADO
-        docs.stream()
-                .filter(d -> d.getEstado() == EstadoDocumentoEnum.CARGADO)
-                .forEach(d -> d.setEstado(EstadoDocumentoEnum.VALIDADO));
-        documentoAdjuntoRepository.saveAll(docs);
-
-        // 3) Notifica a Originación sólo una vez
-        DetalleSolicitudResponseDTO det = originacionClient.obtenerDetalle(numeroSolicitud);
-        String nuevoEstado = anyRejected ? "DOCUMENTACION_RECHAZADA" : "DOCUMENTACION_VALIDADA";
-        String motivo = anyRejected
-                ? "Uno o más documentos fueron rechazados"
-                : "Todos los documentos validados";
-        originacionClient.cambiarEstado(
-                det.getIdSolicitud(), nuevoEstado, motivo, usuario);
+        documentoService.validarTodos(numeroSolicitud, usuario);
 
         return ResponseEntity.ok().build();
     }

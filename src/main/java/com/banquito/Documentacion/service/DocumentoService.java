@@ -9,6 +9,7 @@ import com.banquito.Documentacion.dto.CrearPrestamoRequest;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
+import com.banquito.Documentacion.dto.PrestamoClienteDTO;
 import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
 import com.banquito.Documentacion.enums.TipoDocumentoEnum;
 import com.banquito.Documentacion.exception.CreateEntityException;
@@ -317,6 +318,44 @@ public class DocumentoService {
                 nuevoEstado,
                 motivo,
                 usuario);
+
+        // 3) Cambiar estado del PRÉSTAMO-CLIENTE (MS Préstamos)
+        try {
+            // 3a) obtener idCliente por cédula en MS Clientes (OJO: ruta correcta
+            // /api/v1/clientes/clientes)
+            log.info("[DOC] Buscando cliente por CEDULA={}", det.getCedulaSolicitante());
+            List<ClienteDTO> clientes = clientesClient.findByIdentificacion("CEDULA", det.getCedulaSolicitante());
+            if (clientes == null || clientes.isEmpty()) {
+                log.warn("[DOC] No existe cliente con CEDULA={} -> NO se actualiza préstamo",
+                        det.getCedulaSolicitante());
+                return; // o lanza excepción si lo prefieres
+            }
+            String idCliente = clientes.get(0).getId();
+            log.info("[DOC] Cliente encontrado idCliente={}", idCliente);
+
+            // 3b) buscar el préstamo-cliente por (idCliente, idPrestamo producto)
+            log.info("[DOC] Buscando PrestamoCliente por idCliente={} idPrestamo={}", idCliente, det.getIdPrestamo());
+            PrestamoClienteDTO prestamo = prestamoClient.buscarPrestamo(idCliente, det.getIdPrestamo());
+            if (prestamo == null || prestamo.getId() == null) {
+                log.warn("[DOC] PrestamoCliente no encontrado -> NO se actualiza estado");
+                return;
+            }
+            log.info("[DOC] PrestamoCliente encontrado id={}", prestamo.getId());
+
+            // 3c) actualizar estado del préstamo-cliente
+            String estadoPrestamo = anyRejected ? "CANCELADO" : "APROBADO"; // debe existir en el enum
+            log.info("[DOC] Actualizando estado del PrestamoCliente {} => {}", prestamo.getId(), estadoPrestamo);
+            prestamoClient.actualizarEstado(prestamo.getId(), estadoPrestamo);
+            log.info("[DOC] Estado del PrestamoCliente {} actualizado OK", prestamo.getId());
+
+        } catch (feign.FeignException e) {
+            log.error("[DOC] Error Feign llamando MS externos. status={}, msg={}", e.status(), e.getMessage(), e);
+            throw e; // déjalo fallar para ver el 4xx/5xx si algo está mal
+        } catch (Exception e) {
+            log.error("[DOC] Error actualizando estado del préstamo: {}", e.getMessage(), e);
+            throw e;
+        }
+
     }
 
 }

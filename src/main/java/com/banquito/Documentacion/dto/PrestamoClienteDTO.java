@@ -10,5 +10,6 @@ public class PrestamoClienteDTO {
   private String idPrestamo;
   private BigDecimal montoSolicitado;
   private Integer plazoMeses;
-  // … cualquier otro campo que devuelva el servicio de transacciones
+  private String estado;
+
 }

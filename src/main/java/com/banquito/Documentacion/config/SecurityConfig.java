@@ -18,9 +18,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/v1/**").permitAll() // Por ahora permitimos todo, se puede configurar más tarde
+                .requestMatchers("/api/contratos-credito/**").permitAll()
                 .anyRequest().authenticated()
             );
         
         return http.build();
     }
-} 
+}

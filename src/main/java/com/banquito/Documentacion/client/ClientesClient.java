@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "clientesClient", url = "${cliente.service.url}/api/v1/clientes")
+@FeignClient(name = "clientesClient", url = "${cliente.service.url}/api/clientes/v1/clientes")
 public interface ClientesClient {
   /**
    * Llama a GET /api/v1/clientes?tipoIdentificacion=CEDULA&numeroIdentificacion=0102020202

@@ -5,7 +5,7 @@ import com.banquito.Documentacion.client.ClientesClient;
 import com.banquito.Documentacion.client.PrestamoClient;
 import com.banquito.Documentacion.client.OriginacionClient;
 import com.banquito.Documentacion.dto.ClienteDTO;
-import com.banquito.Documentacion.dto.CrearPrestamoRequest;
+import com.banquito.Documentacion.dto.CrearPrestamoQueueDTO;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
@@ -39,6 +39,7 @@ public class DocumentoService {
     private final DocumentoAdjuntoMapper documentoAdjuntoMapper;
     private final FileStorageService fileStorageService;
     private final OriginacionClient originacionClient;
+    private final PrestamoQueueService prestamoQueueService;
 
     private final CoreBancarioClient coreBancarioClient;
     private final PrestamoClient prestamoClient;
@@ -187,15 +188,14 @@ public class DocumentoService {
         }
         String idCliente = clientes.get(0).getId();
 
-        // b) construir request
-        CrearPrestamoRequest creq = new CrearPrestamoRequest(
+        // b) crear DTO para la cola y enviar a ActiveMQ en lugar de llamada directa
+        CrearPrestamoQueueDTO queueDTO = new CrearPrestamoQueueDTO(
                 idCliente,
                 det.getIdPrestamo(),
                 det.getMontoSolicitado(),
                 det.getPlazoMeses());
-
-        // c) llamas al cliente Feign que expone el POST /prestamos
-        prestamoClient.crearPrestamo(creq);
+        
+        prestamoQueueService.enviarSolicitudPrestamo(queueDTO);
     }
 
     public void cargarTodosYMarcar(

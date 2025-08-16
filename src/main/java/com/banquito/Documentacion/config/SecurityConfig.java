@@ -17,9 +17,8 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/v1/**").permitAll() // Por ahora permitimos todo, se puede configurar más tarde
-                .requestMatchers("/api/contratos-credito/**").permitAll()
-                .anyRequest().authenticated()
+                .requestMatchers("/api/**").permitAll() // Permitir todas las rutas de la API
+                .anyRequest().permitAll() // Permitir todo por ahora
             );
         
         return http.build();

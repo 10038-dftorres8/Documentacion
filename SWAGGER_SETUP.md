@@ -3,12 +3,15 @@
 ## URLs de Acceso
 
 ### Interfaz de Swagger UI
-- **URL Principal**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api/documentacion/swagger-ui.html
-- **URL Alternativa**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api/documentacion/swagger-ui/
+- **URL Principal**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/swagger-ui.html
+- **URL Alternativa**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/swagger-ui/
 
 ### Documentación de la API
-- **OpenAPI JSON**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api/documentacion/api-docs
-- **Configuración de Swagger**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api/documentacion/api-docs/swagger-config
+- **OpenAPI JSON**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api-docs
+- **Configuración de Swagger**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api-docs/swagger-config
+
+### Endpoint de Salud
+- **Health Check**: http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com/api/health
 
 ## Configuración Implementada
 
@@ -26,9 +29,9 @@
 - Se permitió el acceso público a todas las rutas de Swagger
 - Rutas permitidas: `/swagger-ui/**`, `/api-docs/**`, `/v3/api-docs/**`
 
-### 4. Perfil de Producción
-- Se creó `application-prod.properties` con configuración optimizada
-- El Dockerfile usa el perfil `prod` por defecto
+### 4. Configuración Unificada
+- Se usa solo `application.properties` para toda la configuración
+- El Dockerfile no especifica un perfil específico
 
 ## Características de Swagger UI
 
@@ -51,7 +54,26 @@ Para verificar que la configuración funciona correctamente:
 
 Si Swagger no se carga correctamente:
 
-1. Verifica que el puerto 80 esté abierto en el ALB
-2. Confirma que las rutas de Swagger estén permitidas en el security config
-3. Revisa los logs de la aplicación para errores de configuración
-4. Verifica que el perfil `prod` esté activo
+1. **Error 503 Service Temporarily Unavailable**:
+   - Verifica que la aplicación esté ejecutándose en el contenedor
+   - Revisa los logs del contenedor: `docker logs <container_id>`
+   - Confirma que el puerto 80 esté abierto en el ALB
+
+2. **Error "Servicio no encontrado"**:
+   - Verifica que las rutas estén configuradas correctamente
+   - Confirma que el contexto base sea `/` (no `/api/documentacion`)
+   - Prueba el endpoint de salud: `/api/health`
+
+3. **Configuración de Seguridad**:
+   - Confirma que las rutas de Swagger estén permitidas en el security config
+   - Verifica que `/api/**` esté permitido
+
+4. **Perfil y Configuración**:
+   - Revisa los logs de la aplicación para errores de configuración
+   - Confirma que `springdoc.swagger-ui.enabled=true`
+   - Verifica que la configuración en `application.properties` sea correcta
+
+5. **Verificación de Rutas**:
+   - Swagger UI: `/swagger-ui.html`
+   - API Docs: `/api-docs`
+   - Health Check: `/api/health`

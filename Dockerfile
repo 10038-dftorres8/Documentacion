@@ -14,7 +14,6 @@ RUN mkdir -p /app/uploads
 EXPOSE 80
 
 # Variables de entorno por defecto
-ENV SPRING_PROFILES_ACTIVE=prod
 ENV SERVER_PORT=80
 
 # Comando para ejecutar la aplicación

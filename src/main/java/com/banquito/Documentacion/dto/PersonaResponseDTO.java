@@ -1,8 +1,17 @@
 package com.banquito.Documentacion.dto;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import lombok.Data;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true) // <- opcional pero recomendable
+
 public class PersonaResponseDTO {
   private String id;
-  // + getters/setters
+  private String tipoIdentificacion;
+  private String numeroIdentificacion;
+  private String nombres;
+  private String apellidos;
+  private String correoElectronico;
+  private String telefono;
 }

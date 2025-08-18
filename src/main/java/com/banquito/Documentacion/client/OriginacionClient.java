@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 
-@FeignClient(name = "originacionClient", url = "${originacion.service.url}/api/originacion/v1/solicitudes")
+@FeignClient(name = "originacionClient", url = "${originacion.service.url}/v1/solicitudes")
 public interface OriginacionClient {
     @GetMapping("/{numeroSolicitud}/detalle")
     DetalleSolicitudResponseDTO obtenerDetalle(@PathVariable String numeroSolicitud);

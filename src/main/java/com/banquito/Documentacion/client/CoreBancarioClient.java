@@ -7,7 +7,7 @@ import com.banquito.Documentacion.dto.PersonaResponseDTO;
 
 @FeignClient(name = "coreBancarioClient", url = "${cliente.service.url}")
 public interface CoreBancarioClient {
-  @GetMapping("/api/clientes/v1/clientes/personas/{tipoIdentificacion}/{numeroIdentificacion}")
+  @GetMapping("/v1/clientes/personas/{tipoIdentificacion}/{numeroIdentificacion}")
   PersonaResponseDTO consultarPersonaPorIdentificacion(
     @PathVariable("tipoIdentificacion") String tipoIdentificacion,
     @PathVariable("numeroIdentificacion") String numeroIdentificacion

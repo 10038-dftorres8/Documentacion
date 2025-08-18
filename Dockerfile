@@ -11,11 +11,11 @@ COPY target/Documentacion-0.0.1-SNAPSHOT.jar app.jar
 RUN mkdir -p /app/uploads
 
 # Exponer puerto
-EXPOSE 8084
+EXPOSE 80
 
 # Variables de entorno por defecto
-ENV SPRING_PROFILES_ACTIVE=docker
-ENV SERVER_PORT=8084
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV SERVER_PORT=80
 
 # Comando para ejecutar la aplicación
 ENTRYPOINT ["java", "-jar", "app.jar"] 

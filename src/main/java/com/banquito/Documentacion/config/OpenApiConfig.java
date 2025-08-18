@@ -29,11 +29,14 @@ public class OpenApiConfig {
                                 .url("https://opensource.org/licenses/MIT")))
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8084")
-                                .description("Servidor de Desarrollo"),
+                                .url("http://banquito-alb-1166574131.us-east-2.elb.amazonaws.com")
+                                .description("Servidor AWS ALB - Producción"),
                         new Server()
                                 .url("https://api-documentacion.banquito.com")
-                                .description("Servidor de Producción")
+                                .description("Servidor de Producción"),
+                        new Server()
+                                .url("http://localhost:8084")
+                                .description("Servidor de Desarrollo")
                 ));
     }
 } 

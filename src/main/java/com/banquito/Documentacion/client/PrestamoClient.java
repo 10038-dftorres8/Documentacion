@@ -13,13 +13,13 @@ import com.banquito.Documentacion.dto.PrestamoClienteDTO;
 
 @FeignClient(name = "prestamoClient", url = "${prestamo.service.url}")
 public interface PrestamoClient {
-  @PostMapping("/api/prestamos/v1/prestamos-clientes")
+  @PostMapping("/v1/prestamos-clientes")
   PrestamoClienteDTO crearPrestamo(@RequestBody CrearPrestamoRequest req);
 
-  @GetMapping("/api/prestamos/v1/prestamos-clientes/buscar")
+  @GetMapping("/v1/prestamos-clientes/buscar")
   PrestamoClienteDTO buscarPrestamo(@RequestParam String idCliente, @RequestParam String idPrestamo);
 
-  @PutMapping("/api/prestamos/v1/prestamos-clientes/{id}/estado")
+  @PutMapping("/v1/prestamos-clientes/{id}/estado")
   PrestamoClienteDTO actualizarEstado(@PathVariable Integer id,
       @RequestParam String estado);
 

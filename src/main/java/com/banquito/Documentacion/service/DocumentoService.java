@@ -42,7 +42,6 @@ public class DocumentoService {
     private final OriginacionClient originacionClient;
     private final PrestamoQueueService prestamoQueueService;
 
-
     private final CoreBancarioClient coreBancarioClient;
     private final PrestamoClient prestamoClient;
     private final ClientesClient clientesClient;
@@ -178,6 +177,23 @@ public class DocumentoService {
                 "Se validaron todos los documentos",
                 usuario);
 
+        // Crearle una cuenta de ahorros al cliente
+        try {
+            clientesClient.crearCuentaAhorros(det.getCedulaSolicitante());
+            log.info("[DOC] Cuenta de ahorros creada/solicitada para cédula {}", det.getCedulaSolicitante());
+        } catch (feign.FeignException e) {
+            // Si el MS devuelve conflicto (ya existe) o cualquier 4xx/5xx, decide si seguir
+            // o no:
+            if (e.status() == 409) {
+                log.info("[DOC] La cuenta ya existía para cédula {} (409 Conflict).", det.getCedulaSolicitante());
+            } else {
+                log.error("[DOC] Error creando cuenta de ahorros en MS Clientes: status={}, msg={}", e.status(),
+                        e.getMessage());
+                // Si NO quieres bloquear el proceso principal, comenta la siguiente línea:
+                // throw e;
+            }
+        }
+
         // a) obtener idCliente
         coreBancarioClient
                 .consultarPersonaPorIdentificacion("CEDULA", det.getCedulaSolicitante());
@@ -191,14 +207,14 @@ public class DocumentoService {
         String idCliente = clientes.get(0).getId();
 
         /*
-        CrearPrestamoRequest creq = new CrearPrestamoRequest(
-                idCliente,
-                det.getIdPrestamo(),
-                det.getMontoSolicitado(),
-                det.getPlazoMeses());
-
-        // c) llamas al cliente Feign que expone el POST /prestamos
-        prestamoClient.crearPrestamo(creq);
+         * CrearPrestamoRequest creq = new CrearPrestamoRequest(
+         * idCliente,
+         * det.getIdPrestamo(),
+         * det.getMontoSolicitado(),
+         * det.getPlazoMeses());
+         * 
+         * // c) llamas al cliente Feign que expone el POST /prestamos
+         * prestamoClient.crearPrestamo(creq);
          */
         // b) crear DTO para la cola y enviar a ActiveMQ en lugar de llamada directa
         CrearPrestamoQueueDTO queueDTO = new CrearPrestamoQueueDTO(

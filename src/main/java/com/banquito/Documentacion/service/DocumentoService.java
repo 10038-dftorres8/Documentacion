@@ -4,13 +4,17 @@ import com.banquito.Documentacion.client.CoreBancarioClient;
 import com.banquito.Documentacion.client.ClientesClient;
 import com.banquito.Documentacion.client.PrestamoClient;
 import com.banquito.Documentacion.client.OriginacionClient;
+import com.banquito.Documentacion.client.TransaccionesClient;
+import com.banquito.Documentacion.client.CuentasClient;
 import com.banquito.Documentacion.dto.ClienteDTO;
 import com.banquito.Documentacion.dto.CrearPrestamoQueueDTO;
 import com.banquito.Documentacion.dto.CrearPrestamoRequest;
+import com.banquito.Documentacion.dto.CuentaClienteDTO;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoDTO;
 import com.banquito.Documentacion.dto.DocumentoAdjuntoResponseDTO;
 import com.banquito.Documentacion.dto.PrestamoClienteDTO;
+import com.banquito.Documentacion.dto.TransferRequest;
 import com.banquito.Documentacion.enums.EstadoDocumentoEnum;
 import com.banquito.Documentacion.enums.TipoDocumentoEnum;
 import com.banquito.Documentacion.exception.CreateEntityException;
@@ -25,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.nio.file.Paths;
 
 import java.time.LocalDateTime;
@@ -41,6 +46,8 @@ public class DocumentoService {
     private final FileStorageService fileStorageService;
     private final OriginacionClient originacionClient;
     private final PrestamoQueueService prestamoQueueService;
+    private final TransaccionesClient transaccionesClient;
+    private final CuentasClient cuentasClient;
 
     private final CoreBancarioClient coreBancarioClient;
     private final PrestamoClient prestamoClient;
@@ -348,6 +355,79 @@ public class DocumentoService {
                 nuevoEstado,
                 motivo,
                 usuario);
+
+        try {
+            log.info("[DOC] Buscando cliente por CEDULA={}", det.getCedulaSolicitante());
+            List<ClienteDTO> clientes = clientesClient.findByIdentificacion("CEDULA", det.getCedulaSolicitante());
+            if (clientes == null || clientes.isEmpty()) {
+                log.warn("[DOC] No existe cliente con CEDULA={} -> NO se actualiza préstamo ni se desembolsa",
+                        det.getCedulaSolicitante());
+                return;
+            }
+            String idCliente = clientes.get(0).getId();
+            log.info("[DOC] Cliente encontrado idCliente={}", idCliente);
+
+            // Prestamo
+            log.info("[DOC] Buscando PrestamoCliente por idCliente={} idPrestamo={}", idCliente, det.getIdPrestamo());
+            PrestamoClienteDTO prestamo = prestamoClient.buscarPrestamo(idCliente, det.getIdPrestamo());
+            if (prestamo == null || prestamo.getId() == null) {
+                log.warn("[DOC] PrestamoCliente no encontrado -> NO se actualiza estado");
+                return;
+            }
+            String estadoPrestamo = anyRejected ? "CANCELADO" : "APROBADO";
+            log.info("[DOC] Actualizando estado del PrestamoCliente {} => {}", prestamo.getId(), estadoPrestamo);
+            prestamoClient.actualizarEstado(prestamo.getId(), estadoPrestamo);
+            log.info("[DOC] Estado del PrestamoCliente {} actualizado OK", prestamo.getId());
+
+            // ⬇⬇ SOLO si fue aprobado: ejecutamos las 2 transferencias
+            if (!anyRejected) {
+                // 1) obtener la cuenta del cliente (acepta cédula o id, tú dijiste que
+                // cualquiera)
+                List<CuentaClienteDTO> cuentas = cuentasClient.obtenerCuentasPorCliente(det.getCedulaSolicitante());
+                String cuentaCliente = cuentas.stream()
+                        .filter(c -> "ACTIVO".equalsIgnoreCase(c.getEstado()))
+                        .map(CuentaClienteDTO::getNumeroCuenta)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Cliente sin cuenta ACTIVA"));
+
+                // 2) armar transferencias
+                final String CUENTA_BANCO = "1010101010";
+                final String CUENTA_CONCESIONARIO = "2222222222";
+                BigDecimal monto = det.getMontoSolicitado(); // tomado del detalle
+                String descripcion = det.getNumeroSolicitud(); // p.ej. "SOL-20250817-4081"
+
+                // Transferencia 1: Banco -> Cliente
+                TransferRequest t1 = new TransferRequest(
+                        CUENTA_BANCO,
+                        cuentaCliente,
+                        "TRANSFERENCIA",
+                        monto,
+                        descripcion);
+                log.info("[DOC] T1 Banco -> Cliente: {}", t1);
+                transaccionesClient.crearTransferencia(t1);
+                log.info("[DOC] T1 OK");
+
+                // Transferencia 2: Cliente -> Concesionario
+                TransferRequest t2 = new TransferRequest(
+                        cuentaCliente,
+                        CUENTA_CONCESIONARIO,
+                        "TRANSFERENCIA",
+                        monto,
+                        descripcion);
+                log.info("[DOC] T2 Cliente -> Concesionario: {}", t2);
+                transaccionesClient.crearTransferencia(t2);
+                log.info("[DOC] T2 OK");
+            }
+
+        } catch (feign.FeignException e) {
+            log.error("[DOC] Error Feign llamando MS externos. status={}, body={}, msg={}",
+                    e.status(), e.contentUTF8(), e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("[DOC] Error en flujo de validación de contratos/desembolso: {}", e.getMessage(), e);
+            throw e;
+        }
+
 
         // 3) Cambiar estado del PRÉSTAMO-CLIENTE (MS Préstamos)
         try {

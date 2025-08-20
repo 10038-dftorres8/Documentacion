@@ -25,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/documentacion/v1/solicitudes/{numeroSolicitud}/documentos")
+@RequestMapping("/v1/solicitudes/{numeroSolicitud}/documentos")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Documentos de Solicitudes", description = "Operaciones para la gestión de documentos de solicitudes de crédito")

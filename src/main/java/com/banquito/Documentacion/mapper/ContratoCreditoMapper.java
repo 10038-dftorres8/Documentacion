@@ -23,13 +23,13 @@ public interface ContratoCreditoMapper {
     // Mapea de modelo a DTO para creación (dto a entidad)
     @Mapping(target = "idContratoCredito", ignore = true)  // No mapeamos el ID, ya que es autogenerado
     @Mapping(target = "fechaGeneracion", expression = "java(java.time.LocalDateTime.now())") // Establece la fecha actual por defecto
-    @Mapping(target = "fechaFirma", ignore = true) 
+    @Mapping(target = "fechaFirma", ignore = true)
     @Mapping(target = "version", ignore = true) // No mapeamos la versión, la dejamos como está en la base de datos
+    @Mapping(target = "idSolicitud", source = "idSolicitud")
     ContratoCredito toEntity(ContratoCreditoCreateDTO dto);
 
     // Mapea la entidad a DTO para actualización
     @Mapping(target = "idContratoCredito", ignore = true)
-    @Mapping(target = "idSolicitud", ignore = true)
     @Mapping(target = "version", ignore = true)
     void updateEntity(@MappingTarget ContratoCredito entity, ContratoCreditoUpdateDTO dto);
 

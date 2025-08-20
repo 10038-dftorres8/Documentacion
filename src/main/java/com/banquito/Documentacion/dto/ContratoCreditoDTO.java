@@ -13,7 +13,7 @@ import lombok.Data;
 public class ContratoCreditoDTO {
 
     private Long idContratoCredito;
-    private Long idSolicitud;
+    private String numeroSolicitud;
     private String numeroContrato;
     private LocalDateTime fechaGeneracion;
     private LocalDateTime fechaFirma;

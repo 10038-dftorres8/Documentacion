@@ -28,13 +28,17 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ContratoCredito {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_contrato_credito", nullable = false)
     private Long idContratoCredito;
 
-    @Column(name = "id_solicitud", nullable = false, unique = true)
+    @Column(name = "id_solicitud", nullable = false)
     private Long idSolicitud;
+
+    @Column(name = "numero_solicitud", nullable = false, unique = true, length = 30)
+    private String numeroSolicitud;
 
     @Column(name = "numero_contrato", nullable = false, unique = true, length = 50)
     private String numeroContrato;
@@ -86,18 +90,18 @@ public class ContratoCredito {
 
     @Override
     public String toString() {
-        return "ContratoCredito{" +
-                "idContratoCredito=" + idContratoCredito +
-                ", idSolicitud=" + idSolicitud +
-                ", numeroContrato='" + numeroContrato + '\'' +
-                ", fechaGeneracion=" + fechaGeneracion +
-                ", fechaFirma=" + fechaFirma +
-                ", montoAprobado=" + montoAprobado +
-                ", plazoFinalMeses=" + plazoFinalMeses +
-                ", tasaEfectivaAnual=" + tasaEfectivaAnual +
-                ", rutaArchivoFirmado='" + rutaArchivoFirmado + '\'' +
-                ", estado=" + estado +
-                ", version=" + version +
-                '}';
+    return "ContratoCredito{" +
+        "idContratoCredito=" + idContratoCredito +
+        ", numeroSolicitud='" + numeroSolicitud + '\'' +
+        ", numeroContrato='" + numeroContrato + '\'' +
+        ", fechaGeneracion=" + fechaGeneracion +
+        ", fechaFirma=" + fechaFirma +
+        ", montoAprobado=" + montoAprobado +
+        ", plazoFinalMeses=" + plazoFinalMeses +
+        ", tasaEfectivaAnual=" + tasaEfectivaAnual +
+        ", rutaArchivoFirmado='" + rutaArchivoFirmado + '\'' +
+        ", estado=" + estado +
+        ", version=" + version +
+        '}';
     }
 }

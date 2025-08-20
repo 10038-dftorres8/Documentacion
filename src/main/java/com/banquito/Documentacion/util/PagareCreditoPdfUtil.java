@@ -109,10 +109,10 @@ public class PagareCreditoPdfUtil {
         PdfPCell celdaBanco = new PdfPCell();
         celdaBanco.setBorder(Rectangle.NO_BORDER);
         celdaBanco.setHorizontalAlignment(Element.ALIGN_CENTER);
-        celdaBanco.addElement(new Paragraph("_________________________", fontNormal));
+         celdaBanco.addElement(new Paragraph("_________________________", fontNormal));
         celdaBanco.addElement(new Paragraph("Representante del Banco", fontSmall));
-        celdaBanco.addElement(new Paragraph("Nombre: " + safe(representanteBanco), fontSmall));
-        celdaBanco.addElement(new Paragraph("C.I.: " + safe(cedulaRepresentante), fontSmall));
+        celdaBanco.addElement(new Paragraph("Nombre: Lic. Juan Alejandro Gómez Vélez", fontSmall));
+        celdaBanco.addElement(new Paragraph("C.I.: 0158693578", fontSmall));
         tablaFirmas.addCell(celdaBanco);
         PdfPCell celdaDeudor = new PdfPCell();
         celdaDeudor.setBorder(Rectangle.NO_BORDER);

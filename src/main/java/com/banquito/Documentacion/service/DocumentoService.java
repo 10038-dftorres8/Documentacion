@@ -1,6 +1,5 @@
 package com.banquito.Documentacion.service;
 
-import com.banquito.Documentacion.client.CoreBancarioClient;
 import com.banquito.Documentacion.client.ClientesClient;
 import com.banquito.Documentacion.client.PrestamoClient;
 import com.banquito.Documentacion.client.OriginacionClient;
@@ -43,7 +42,6 @@ public class DocumentoService {
     private final PrestamoQueueService prestamoQueueService;
 
 
-    private final CoreBancarioClient coreBancarioClient;
     private final PrestamoClient prestamoClient;
     private final ClientesClient clientesClient;
 
@@ -179,16 +177,14 @@ public class DocumentoService {
                 usuario);
 
         // a) obtener idCliente
-        coreBancarioClient
-                .consultarPersonaPorIdentificacion("CEDULA", det.getCedulaSolicitante());
+
 
         // (3b) Recupera el cliente ya creado en el micro de Clientes
-        List<ClienteDTO> clientes = clientesClient
-                .findByIdentificacion("CEDULA", det.getCedulaSolicitante());
-        if (clientes.isEmpty()) {
+        var persona = clientesClient.consultarPersonaPorIdentificacion("CEDULA", det.getCedulaSolicitante());
+        if (persona == null || persona.getId() == null) {
             throw new IllegalStateException("No existe cliente con esta cédula " + det.getCedulaSolicitante());
         }
-        String idCliente = clientes.get(0).getId();
+        String idCliente = persona.getId();
 
 
         CrearPrestamoRequest creq = new CrearPrestamoRequest(
@@ -339,13 +335,13 @@ public class DocumentoService {
             // 3a) obtener idCliente por cédula en MS Clientes (OJO: ruta correcta
             // /api/v1/clientes/clientes)
             log.info("[DOC] Buscando cliente por CEDULA={}", det.getCedulaSolicitante());
-            List<ClienteDTO> clientes = clientesClient.findByIdentificacion("CEDULA", det.getCedulaSolicitante());
-            if (clientes == null || clientes.isEmpty()) {
+            var persona = clientesClient.consultarPersonaPorIdentificacion("CEDULA", det.getCedulaSolicitante());
+            if (persona == null || persona.getId() == null) {
                 log.warn("[DOC] No existe cliente con CEDULA={} -> NO se actualiza préstamo",
                         det.getCedulaSolicitante());
                 return; // o lanza excepción si lo prefieres
             }
-            String idCliente = clientes.get(0).getId();
+            String idCliente = persona.getId();
             log.info("[DOC] Cliente encontrado idCliente={}", idCliente);
 
             // 3b) buscar el préstamo-cliente por (idCliente, idPrestamo producto)

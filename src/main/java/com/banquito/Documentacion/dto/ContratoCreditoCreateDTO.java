@@ -26,6 +26,10 @@ public class ContratoCreditoCreateDTO {
     @NotNull(message = "El ID de solicitud no puede ser nulo")
     private Long idSolicitud;
 
+    @NotBlank(message = "El número de solicitud no puede estar vacío")
+    @Size(max = 30, message = "El número de solicitud no debe exceder 30 caracteres")
+    private String numeroSolicitud;
+
     @NotBlank(message = "El número de contrato core no puede estar vacío")
     @Size(max = 50, message = "El número de contrato core no debe exceder 50 caracteres")
     private String numeroContrato;

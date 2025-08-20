@@ -14,31 +14,25 @@ import com.banquito.Documentacion.model.ContratoCredito;
 @Repository
 public interface ContratoCreditoRepository extends JpaRepository<ContratoCredito, Long> {
 
-    Optional<ContratoCredito> findByIdSolicitud(Long idSolicitud);
-    
+    Optional<ContratoCredito> findByNumeroSolicitud(String numeroSolicitud);
     Optional<ContratoCredito> findByNumeroContrato(String numeroContrato);
-    
     List<ContratoCredito> findByEstado(ContratoCreditoEstado estado);
-    
-    boolean existsByIdSolicitud(Long idSolicitud);
-    
+    boolean existsByNumeroSolicitud(String numeroSolicitud);
     boolean existsByNumeroContrato(String numeroContrato);
-  
+
     Page<ContratoCredito> findByEstado(ContratoCreditoEstado estado, Pageable pageable);
-    
-    Page<ContratoCredito> findByIdSolicitud(Long idSolicitud, Pageable pageable);
-    
+    Page<ContratoCredito> findByNumeroSolicitud(String numeroSolicitud, Pageable pageable);
     Page<ContratoCredito> findByNumeroContratoContainingIgnoreCase(String numeroContrato, Pageable pageable);
 
     Page<ContratoCredito> findByEstadoAndNumeroContratoContainingIgnoreCase(
         ContratoCreditoEstado estado, String numeroContrato, Pageable pageable);
-    
-    Page<ContratoCredito> findByEstadoAndIdSolicitud(
-        ContratoCreditoEstado estado, Long idSolicitud, Pageable pageable);
-    
-    Page<ContratoCredito> findByNumeroContratoContainingIgnoreCaseAndIdSolicitud(
-        String numeroContrato, Long idSolicitud, Pageable pageable);
-    
-    Page<ContratoCredito> findByEstadoAndNumeroContratoContainingIgnoreCaseAndIdSolicitud(
-        ContratoCreditoEstado estado, String numeroContrato, Long idSolicitud, Pageable pageable);
-} 
+
+    Page<ContratoCredito> findByEstadoAndNumeroSolicitud(
+        ContratoCreditoEstado estado, String numeroSolicitud, Pageable pageable);
+
+    Page<ContratoCredito> findByNumeroContratoContainingIgnoreCaseAndNumeroSolicitud(
+        String numeroContrato, String numeroSolicitud, Pageable pageable);
+
+    Page<ContratoCredito> findByEstadoAndNumeroContratoContainingIgnoreCaseAndNumeroSolicitud(
+        ContratoCreditoEstado estado, String numeroContrato, String numeroSolicitud, Pageable pageable);
+}

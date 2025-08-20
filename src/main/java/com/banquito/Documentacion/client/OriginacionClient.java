@@ -7,16 +7,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
 
-@FeignClient(name = "originacionClient", url = "${originacion.service.url}/v1/solicitudes")
+@FeignClient(name = "originacionClient", url = "${originacion.service.url}")
 public interface OriginacionClient {
-    @GetMapping("/{numeroSolicitud}/detalle")
-    DetalleSolicitudResponseDTO obtenerDetalle(@PathVariable String numeroSolicitud);
+    /**
+     * GET /v1/solicitudes/{numeroSolicitud}/detalle
+     * numeroSolicitud es un String tipo SOL-20250806-7451
+     */
+    @GetMapping("/v1/solicitudes/{numeroSolicitud}/detalle")
+    DetalleSolicitudResponseDTO obtenerDetalle(@PathVariable("numeroSolicitud") String numeroSolicitud);
 
-    @PostMapping("/{idSolicitud}/cambiar-estado")
+    /**
+     * POST /v1/solicitudes/{idSolicitud}/cambiar-estado
+     */
+    @PostMapping("/v1/solicitudes/{idSolicitud}/cambiar-estado")
     void cambiarEstado(
-            @PathVariable Long idSolicitud,
-            @RequestParam String nuevoEstado,
-            @RequestParam String motivo,
-            @RequestParam String usuario);
+        @PathVariable("idSolicitud") Long idSolicitud,
+        @RequestParam("nuevoEstado") String nuevoEstado,
+        @RequestParam("motivo") String motivo,
+        @RequestParam("usuario") String usuario
+    );
 }
 

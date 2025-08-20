@@ -1,22 +1,18 @@
-// src/main/java/com/banquito/Documentacion/client/ClientesClient.java
 package com.banquito.Documentacion.client;
 
-import com.banquito.Documentacion.dto.ClienteDTO;
+import com.banquito.Documentacion.dto.PersonaResponseDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.List;
-
-@FeignClient(name = "clientesClient", url = "${cliente.service.url}/v1/clientes")
+@FeignClient(name = "clientesClient", url = "${cliente.service.url}")
 public interface ClientesClient {
   /**
-   * Llama a GET /api/v1/clientes?tipoIdentificacion=CEDULA&numeroIdentificacion=0102020202
-   * y devuelve una lista (normalmente con un único elemento).
+   * GET /v1/clientes/personas/{tipoIdentificacion}/{numeroIdentificacion}
    */
-  @GetMapping("/clientes")
-  List<ClienteDTO> findByIdentificacion(
-    @RequestParam("tipoIdentificacion") String tipoIdentificacion,
-    @RequestParam("numeroIdentificacion") String numeroIdentificacion
+  @GetMapping("/api/clientes/v1/clientes/personas/{tipoIdentificacion}/{numeroIdentificacion}")
+  PersonaResponseDTO consultarPersonaPorIdentificacion(
+    @PathVariable("tipoIdentificacion") String tipoIdentificacion,
+    @PathVariable("numeroIdentificacion") String numeroIdentificacion
   );
 }

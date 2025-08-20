@@ -1,3 +1,4 @@
+
 package com.banquito.Documentacion.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -6,6 +7,12 @@ import java.math.BigDecimal;
 public class SolicitudResumenDTO {
     @JsonProperty("id_solicitud")
     private Long idSolicitud;
+
+    @JsonProperty("cedula_solicitante")
+    private String cedulaSolicitante;
+
+    @JsonProperty("nombres_solicitante")
+    private String nombresSolicitante;
 
     @JsonProperty("precio_final_vehiculo")
     private BigDecimal precioFinalVehiculo;
@@ -35,4 +42,20 @@ public class SolicitudResumenDTO {
 
     public BigDecimal getTasaEfectivaAnual() { return tasaEfectivaAnual; }
     public void setTasaEfectivaAnual(BigDecimal tasaEfectivaAnual) { this.tasaEfectivaAnual = tasaEfectivaAnual; }
+
+    public String getCedulaSolicitante() {
+        return cedulaSolicitante;
+    }
+
+    public void setCedulaSolicitante(String cedulaSolicitante) {
+        this.cedulaSolicitante = cedulaSolicitante;
+    }
+
+    public String getNombresSolicitante() {
+        return nombresSolicitante;
+    }
+
+    public void setNombresSolicitante(String nombresSolicitante) {
+        this.nombresSolicitante = nombresSolicitante;
+    }
 }

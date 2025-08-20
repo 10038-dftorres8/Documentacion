@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.banquito.Documentacion.client.SolicitudCreditoClient;
+import com.banquito.Documentacion.client.OriginacionClient;
 import com.banquito.Documentacion.dto.*;
 import com.banquito.Documentacion.mapper.ContratoCreditoMapper;
 import com.banquito.Documentacion.mapper.PagareMapper;
@@ -32,24 +33,28 @@ import com.banquito.Documentacion.repository.PagareRepository;
 public class ContratoCreditoService {
 
     private static final Logger log = LoggerFactory.getLogger(ContratoCreditoService.class);
+    private static final String CONTRATO_NO_ENCONTRADO = "Contrato no encontrado: ";
     private final ContratoCreditoRepository contratoCreditoRepository;
     private final PagareRepository pagareRepository;
     private final ContratoCreditoMapper contratoCreditoMapper;
     private final PagareMapper pagareMapper;
     private final SolicitudCreditoClient solicitudCreditoClient;
+    private final OriginacionClient originacionClient;
 
     public ContratoCreditoService(
         ContratoCreditoRepository contratoCreditoRepository,
         PagareRepository pagareRepository,
         ContratoCreditoMapper contratoCreditoMapper,
         PagareMapper pagareMapper,
-        SolicitudCreditoClient solicitudCreditoClient
+        SolicitudCreditoClient solicitudCreditoClient,
+        OriginacionClient originacionClient
     ) {
         this.contratoCreditoRepository = contratoCreditoRepository;
         this.pagareRepository = pagareRepository;
         this.contratoCreditoMapper = contratoCreditoMapper;
         this.pagareMapper = pagareMapper;
-        this.solicitudCreditoClient = solicitudCreditoClient;
+    this.solicitudCreditoClient = solicitudCreditoClient;
+    this.originacionClient = originacionClient;
     }
 
     // -------- CONTRATO CREDITO --------
@@ -57,8 +62,35 @@ public class ContratoCreditoService {
     @Transactional
     public ContratoCreditoDTO getContratoCreditoById(Long id) {
         ContratoCredito contrato = contratoCreditoRepository.findById(id)
-            .orElseThrow(() -> new ContratoCreditoGenerationException("Contrato no encontrado: " + id));
+            .orElseThrow(() -> new ContratoCreditoGenerationException(CONTRATO_NO_ENCONTRADO + id));
         return contratoCreditoMapper.toDto(contrato);
+    }
+
+    /**
+     * Lógica para obtener los datos del cliente y generar el PDF del contrato
+     * usando numeroSolicitud como clave y OriginacionClient para obtener los datos.
+     */
+    public byte[] generarPdfContrato(Long idContrato, ContratoCreditoDTO contratoDto) {
+        try {
+            String numeroSolicitud = contratoDto.getNumeroSolicitud();
+            if (numeroSolicitud == null || numeroSolicitud.isEmpty()) {
+                throw new IllegalStateException("El contrato no tiene numeroSolicitud asociado");
+            }
+            DetalleSolicitudResponseDTO detalle = originacionClient.obtenerDetalle(numeroSolicitud);
+            if (detalle == null) {
+                throw new IllegalStateException("No se encontró detalle de la solicitud para el número: " + numeroSolicitud);
+            }
+            // Usar directamente el DTO de la solicitud para el PDF
+            return com.banquito.Documentacion.util.ContratoCreditoPdfUtil.generarPdfContratoSoloDatosJson(detalle);
+        } catch (Exception ex) {
+            log.error("Error generando PDF del contrato {}: {}", idContrato, ex.getMessage(), ex);
+            throw new ContratoCreditoGenerationException("Error generando PDF del contrato: " + ex.getMessage());
+        }
+    }
+
+    // Cambia la obtención de detalle de solicitud para usar numeroSolicitud (String)
+    public DetalleSolicitudResponseDTO obtenerDetalleSolicitudPorNumero(String numeroSolicitud) {
+        return originacionClient.obtenerDetalle(numeroSolicitud);
     }
 
     @Transactional
@@ -68,33 +100,22 @@ public class ContratoCreditoService {
         try {
             solicitud = solicitudCreditoClient.obtenerSolicitudPorId(dto.getIdSolicitud());
         } catch (Exception ex) {
-            // Loguea advertencia pero no detiene el proceso
-            System.err.println("[WARN] No se pudo obtener la solicitud desde el MS de originación para el id: " + dto.getIdSolicitud() + ". Se usará el DTO recibido. Error: " + ex.getMessage());
+            log.warn("No se pudo obtener la solicitud desde el MS de originación para el id: {}. Se usará el DTO recibido. Error: {}", dto.getIdSolicitud(), ex.getMessage());
         }
 
-        Long idSolicitudFinal = null;
-        if (solicitud != null && solicitud.getIdSolicitud() != null) {
-            idSolicitudFinal = solicitud.getIdSolicitud();
-        } else {
-            idSolicitudFinal = dto.getIdSolicitud();
-            if (idSolicitudFinal == null) {
-                throw new ContratoCreditoGenerationException("No se puede crear el contrato: idSolicitud es null tanto en el DTO como en la solicitud externa.");
-            }
-            System.err.println("[WARN] Usando idSolicitud del DTO porque la solicitud externa es null o inválida para el id: " + dto.getIdSolicitud());
-        }
-
-        // 3. Validaciones de unicidad
-        if (contratoCreditoRepository.existsByIdSolicitud(idSolicitudFinal)) {
-            throw new ContratoCreditoGenerationException("Ya existe un contrato para solicitud " + idSolicitudFinal);
-        }
+        // Validación de unicidad
         if (contratoCreditoRepository.existsByNumeroContrato(dto.getNumeroContrato())) {
             throw new NumeroContratoYaExisteException(dto.getNumeroContrato(), "ContratoCredito");
         }
 
-        // 4. Construir la entidad, priorizando datos externos si existen
+        // Construir la entidad, priorizando datos externos si existen
         ContratoCredito contrato = contratoCreditoMapper.toEntity(dto);
-        contrato.setIdSolicitud(idSolicitudFinal);
+        // SIEMPRE asignar el numeroSolicitud del DTO recibido (para todos los casos)
+        contrato.setNumeroSolicitud(dto.getNumeroSolicitud());
         if (solicitud != null) {
+            // Si el MS responde y trae un número de solicitud, sobreescribe
+            // (descomenta si tu DTO de resumen lo tiene: solicitud.getNumeroSolicitud())
+            // if (solicitud.getNumeroSolicitud() != null) contrato.setNumeroSolicitud(solicitud.getNumeroSolicitud());
             if (solicitud.getMontoAprobado() != null) contrato.setMontoAprobado(solicitud.getMontoAprobado());
             if (solicitud.getPlazoFinalMeses() != null) contrato.setPlazoFinalMeses(solicitud.getPlazoFinalMeses().longValue());
             if (solicitud.getTasaEfectivaAnual() != null) contrato.setTasaEfectivaAnual(solicitud.getTasaEfectivaAnual());
@@ -102,28 +123,15 @@ public class ContratoCreditoService {
         contrato.setEstado(ContratoCreditoEstado.PENDIENTE_FIRMA);
         contrato.setVersion(1L);
 
-        // 5. Guardar y retornar el DTO
+        // Guardar y retornar el DTO
         ContratoCredito saved = contratoCreditoRepository.save(contrato);
         return contratoCreditoMapper.toDto(saved);
     }
 
     @Transactional
-    public ContratoCreditoDTO updateContratoCredito(Long id, ContratoCreditoUpdateDTO dto) {
-        if (!id.equals(dto.getIdContratoCredito())) {
-            throw new ContratoCreditoGenerationException("El ID del path no coincide con el del body");
-        }
-        ContratoCredito existing = contratoCreditoRepository.findById(id)
-            .orElseThrow(() -> new ContratoCreditoGenerationException("Contrato no encontrado: " + id));
-
-        contratoCreditoMapper.updateEntity(existing, dto);
-        ContratoCredito updated = contratoCreditoRepository.save(existing);
-        return contratoCreditoMapper.toDto(updated);
-    }
-
-    @Transactional
     public ContratoCreditoDTO logicalDeleteContratoCredito(Long id) {
         ContratoCredito existing = contratoCreditoRepository.findById(id)
-            .orElseThrow(() -> new ContratoCreditoGenerationException("Contrato no encontrado: " + id));
+            .orElseThrow(() -> new ContratoCreditoGenerationException(CONTRATO_NO_ENCONTRADO + id));
 
         if (ContratoCreditoEstado.ACTIVO.equals(existing.getEstado())) {
             throw new ContratoCreditoGenerationException("El contrato ya está cancelado: " + id);
@@ -137,37 +145,34 @@ public class ContratoCreditoService {
     public Page<ContratoCreditoDTO> findContratosConFiltros(
         ContratoCreditoEstado estado,
         String numeroContrato,
-        Long idSolicitud,
+        String numeroSolicitud,
         Pageable pageable
     ) {
         Page<ContratoCredito> contratos;
-        if (estado != null && numeroContrato != null && idSolicitud != null) {
-            contratos = contratoCreditoRepository.findByEstadoAndNumeroContratoContainingIgnoreCaseAndIdSolicitud(
-                estado, numeroContrato, idSolicitud, pageable);
+        if (estado != null && numeroContrato != null && numeroSolicitud != null) {
+            contratos = contratoCreditoRepository.findByEstadoAndNumeroContratoContainingIgnoreCaseAndNumeroSolicitud(
+                estado, numeroContrato, numeroSolicitud, pageable);
         } else if (estado != null && numeroContrato != null) {
             contratos = contratoCreditoRepository.findByEstadoAndNumeroContratoContainingIgnoreCase(
                 estado, numeroContrato, pageable);
-        } else if (estado != null && idSolicitud != null) {
-            contratos = contratoCreditoRepository.findByEstadoAndIdSolicitud(estado, idSolicitud, pageable);
-        } else if (numeroContrato != null && idSolicitud != null) {
-            contratos = contratoCreditoRepository.findByNumeroContratoContainingIgnoreCaseAndIdSolicitud(
-                numeroContrato, idSolicitud, pageable);
+        } else if (estado != null && numeroSolicitud != null) {
+            contratos = contratoCreditoRepository.findByEstadoAndNumeroSolicitud(estado, numeroSolicitud, pageable);
+        } else if (numeroContrato != null && numeroSolicitud != null) {
+            contratos = contratoCreditoRepository.findByNumeroContratoContainingIgnoreCaseAndNumeroSolicitud(
+                numeroContrato, numeroSolicitud, pageable);
         } else if (estado != null) {
             contratos = contratoCreditoRepository.findByEstado(estado, pageable);
         } else if (numeroContrato != null) {
             contratos = contratoCreditoRepository.findByNumeroContratoContainingIgnoreCase(numeroContrato, pageable);
-        } else if (idSolicitud != null) {
-            contratos = contratoCreditoRepository.findByIdSolicitud(idSolicitud, pageable);
+        } else if (numeroSolicitud != null) {
+            contratos = contratoCreditoRepository.findByNumeroSolicitud(numeroSolicitud, pageable);
         } else {
             contratos = contratoCreditoRepository.findAll(pageable);
         }
         return contratos.map(contratoCreditoMapper::toDto);
     }
 
-    @Transactional(readOnly = true)
-    public boolean existePorSolicitud(Long idSolicitud) {
-        return contratoCreditoRepository.existsByIdSolicitud(idSolicitud);
-    }
+    // Método eliminado: existePorSolicitud(Long idSolicitud)
 
     // -------- PAGARE (Integrado) --------
 
@@ -247,7 +252,6 @@ public class ContratoCreditoService {
         }
         List<Pagare> pagares = new ArrayList<>();
         BigDecimal cuotaMensual = calcularCuotaMensual(montoSolicitado, tasaAnual, plazoMeses);
-
         for (int i = 1; i <= plazoMeses; i++) {
             Pagare p = new Pagare();
             p.setIdContratoCredito(idContratoCredito);
@@ -267,11 +271,12 @@ public class ContratoCreditoService {
             .orElseThrow(() -> new PagareGenerationException("Contrato de crédito no encontrado: " + idContratoCredito));
 
         BigDecimal montoSolicitado = contrato.getMontoAprobado();
+
         BigDecimal tasaAnual = contrato.getTasaEfectivaAnual();
         int plazoMeses = contrato.getPlazoFinalMeses().intValue();
         LocalDate fechaInicio = contrato.getFechaGeneracion().toLocalDate(); // Ajusta si tienes un campo específico para fecha de inicio
 
-        return this.generarPagaresDesdeParams(idContratoCredito, montoSolicitado, tasaAnual, plazoMeses, fechaInicio);
+    return generarPagaresDesdeParams(idContratoCredito, montoSolicitado, tasaAnual, plazoMeses, fechaInicio);
     }
 
 
@@ -279,7 +284,7 @@ public class ContratoCreditoService {
         if (tasaAnual == null || tasaAnual.compareTo(BigDecimal.ZERO) <= 0) {
             return monto.divide(BigDecimal.valueOf(plazoMeses), 2, RoundingMode.HALF_UP);
         }
-        BigDecimal tasaMensual = tasaAnual.divide(BigDecimal.valueOf(100 * 12), 10, RoundingMode.HALF_UP);
+    BigDecimal tasaMensual = tasaAnual.divide(BigDecimal.valueOf(100L * 12L), 10, RoundingMode.HALF_UP);
         BigDecimal factor = BigDecimal.ONE.add(tasaMensual).pow(plazoMeses);
         BigDecimal numerador = monto.multiply(tasaMensual).multiply(factor);
         BigDecimal denominador = factor.subtract(BigDecimal.ONE);
@@ -288,5 +293,35 @@ public class ContratoCreditoService {
 
     public boolean existenPagaresPorContrato(Long idContratoCredito) {
         return pagareRepository.existsByIdContratoCredito(idContratoCredito);
+    }
+
+    /**
+     * Dado el idContratoCredito, obtiene el numeroSolicitud asociado usando el idSolicitud y el MS de originación
+     */
+    public String obtenerNumeroSolicitudPorIdContrato(Long idContratoCredito) {
+        Optional<ContratoCredito> contratoOpt = contratoCreditoRepository.findById(idContratoCredito);
+        if (contratoOpt.isEmpty()) {
+            throw new IllegalArgumentException(CONTRATO_NO_ENCONTRADO + idContratoCredito);
+        }
+        ContratoCredito contrato = contratoOpt.get();
+        String numeroSolicitud = contrato.getNumeroSolicitud();
+        if (numeroSolicitud == null || numeroSolicitud.isEmpty()) {
+            throw new IllegalStateException("El contrato no tiene numeroSolicitud asociado");
+        }
+        return numeroSolicitud;
+    }
+
+    // Utilidad para evitar nulls en extras
+
+    @Transactional
+    public ContratoCreditoDTO updateContratoCredito(Long id, ContratoCreditoUpdateDTO dto) {
+        if (!id.equals(dto.getIdContratoCredito())) {
+            throw new ContratoCreditoGenerationException("El ID del path no coincide con el del body");
+        }
+        ContratoCredito existing = contratoCreditoRepository.findById(id)
+            .orElseThrow(() -> new ContratoCreditoGenerationException(CONTRATO_NO_ENCONTRADO + id));
+        contratoCreditoMapper.updateEntity(existing, dto);
+        ContratoCredito updated = contratoCreditoRepository.save(existing);
+        return contratoCreditoMapper.toDto(updated);
     }
 }

@@ -1,5 +1,7 @@
 
 package com.banquito.Documentacion.controller;
+// import com.banquito.Documentacion.client.SolicitudCreditoClient; // Eliminado, no se usa
+// import com.banquito.Documentacion.dto.SolicitudResumenDTO; // Eliminado, no se usa
 
 import com.banquito.Documentacion.dto.*;
 import com.banquito.Documentacion.enums.ContratoCreditoEstado;
@@ -22,15 +24,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import com.banquito.Documentacion.client.PersonaFeignClient;
-import com.banquito.Documentacion.client.VehiculoFeignClient;
-import com.banquito.Documentacion.client.SolicitudCreditoClient;
+import com.banquito.Documentacion.client.ClientesClient;
+import com.banquito.Documentacion.client.OriginacionClient;
 import com.banquito.Documentacion.config.BancoProperties;
-import com.banquito.Documentacion.util.ContratoCreditoPdfUtil;
+// import com.banquito.Documentacion.util.ContratoCreditoPdfUtil; // Eliminado, no se usa
 import com.banquito.Documentacion.util.dto.PersonaInfoDTO;
-import com.banquito.Documentacion.util.dto.VehiculoInfoDTO;
-import com.banquito.Documentacion.util.dto.SolicitudResumenDTO;
-import com.banquito.Documentacion.util.dto.SolicitudCompletaDTO;
+// import com.banquito.Documentacion.util.dto.VehiculoInfoDTO; // Eliminado, no se usa
+// import com.banquito.Documentacion.util.dto.SolicitudResumenDTO; // Removed duplicate import
+// import com.banquito.Documentacion.dto.SolicitudResumenDTO; // Eliminado, no se usa
+// import com.banquito.Documentacion.util.dto.SolicitudCompletaDTO; // Eliminado, no se usa
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,103 +47,23 @@ public class ContratoCreditoController {
 
     private static final Logger log = LoggerFactory.getLogger(ContratoCreditoController.class);
     private final ContratoCreditoService service;
-    private final PersonaFeignClient personaFeignClient;
-    private final VehiculoFeignClient vehiculoFeignClient;
-    private final SolicitudCreditoClient solicitudCreditoClient;
+    private final ClientesClient clientesClient;
+    private final OriginacionClient originacionClient;
     private final BancoProperties bancoProperties;
+    // private final SolicitudCreditoClient solicitudCreditoClient; // Eliminado, no se usa
 
-    public ContratoCreditoController(ContratoCreditoService service, PersonaFeignClient personaFeignClient, VehiculoFeignClient vehiculoFeignClient, SolicitudCreditoClient solicitudCreditoClient, BancoProperties bancoProperties) {
+    public ContratoCreditoController(ContratoCreditoService service, ClientesClient clientesClient, OriginacionClient originacionClient, BancoProperties bancoProperties) {
         this.service = service;
-        this.personaFeignClient = personaFeignClient;
-        this.vehiculoFeignClient = vehiculoFeignClient;
-        this.solicitudCreditoClient = solicitudCreditoClient;
+        this.clientesClient = clientesClient;
+        this.originacionClient = originacionClient;
         this.bancoProperties = bancoProperties;
     }
     @Operation(summary = "Genera y descarga el PDF del contrato de crédito")
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<ByteArrayResource> descargarPdfContrato(@PathVariable Long id) {
         ContratoCreditoDTO contrato = service.getContratoCreditoById(id);
-        
-        // Obtener datos reales de identificación desde la solicitud
-        String tipoIdentificacion = null;
-        String numeroIdentificacion = null;
-        
         try {
-            SolicitudCompletaDTO solicitudCompleta = solicitudCreditoClient.obtenerSolicitudCompleta(contrato.getIdSolicitud());
-            if (solicitudCompleta != null) {
-                tipoIdentificacion = solicitudCompleta.getTipoIdentificacionCliente();
-                numeroIdentificacion = solicitudCompleta.getNumeroIdentificacionCliente();
-                log.info("Datos de identificación obtenidos desde solicitud: tipo={}, numero={}", tipoIdentificacion, numeroIdentificacion);
-            }
-        } catch (Exception ex) {
-            log.warn("No se pudo obtener la solicitud completa para idSolicitud={}: {}", contrato.getIdSolicitud(), ex.getMessage());
-        }
-        
-        // Si no se pudieron obtener los datos, usar valores por defecto para testing
-        if (tipoIdentificacion == null || numeroIdentificacion == null) {
-            tipoIdentificacion = "CEDULA";
-            numeroIdentificacion = "0102030405";
-            log.warn("Usando datos de identificación por defecto para testing: tipo={}, numero={}", tipoIdentificacion, numeroIdentificacion);
-        }
-
-        PersonaInfoDTO persona = null;
-        try {
-            persona = personaFeignClient.obtenerPersonaPorIdentificacion(tipoIdentificacion, numeroIdentificacion);
-            if (persona == null) {
-                log.warn("No se pudo obtener datos de persona para tipo={} numero={}", tipoIdentificacion, numeroIdentificacion);
-                persona = new PersonaInfoDTO();
-                // Establecer datos por defecto si no se encuentra la persona
-                persona.setTipoIdentificacion(tipoIdentificacion);
-                persona.setNumeroIdentificacion(numeroIdentificacion);
-                persona.setNombre("Cliente No Encontrado");
-            } else {
-                log.info("Datos de persona obtenidos exitosamente para: {}", persona.getNombre());
-            }
-        } catch (Exception ex) {
-            log.warn("Error al conectar con el servicio de persona (tipo={}, numero={}): {}", tipoIdentificacion, numeroIdentificacion, ex.getMessage());
-            persona = new PersonaInfoDTO();
-            persona.setTipoIdentificacion(tipoIdentificacion);
-            persona.setNumeroIdentificacion(numeroIdentificacion);
-            persona.setNombre("Error al obtener datos");
-        }
-
-        VehiculoInfoDTO vehiculo = null;
-        try {
-            SolicitudResumenDTO resumen = vehiculoFeignClient.obtenerResumenSolicitud(contrato.getIdSolicitud());
-            if (resumen == null) {
-                log.warn("No se pudo obtener resumen de solicitud para idSolicitud={}", contrato.getIdSolicitud());
-                vehiculo = new VehiculoInfoDTO();
-            } else {
-                vehiculo = new VehiculoInfoDTO();
-                vehiculo.setMarca(resumen.getMarcaVehiculo());
-                vehiculo.setModelo(resumen.getModeloVehiculo());
-                vehiculo.setAnio(null); // No viene en el resumen
-                vehiculo.setValor(resumen.getValorVehiculo() != null ? resumen.getValorVehiculo().doubleValue() : null);
-                vehiculo.setColor(null); // No viene en el resumen
-                vehiculo.setExtras(null); // No viene en el resumen
-                vehiculo.setEstado(null); // No viene en el resumen
-                vehiculo.setTipo(null); // No viene en el resumen
-                vehiculo.setCombustible(null); // No viene en el resumen
-                vehiculo.setCondicion(null); // No viene en el resumen
-                vehiculo.setIdentificadorVehiculo(null); // No viene en el resumen
-            }
-        } catch (Exception ex) {
-            log.warn("No se pudo conectar al servicio externo de solicitud/resumen: {}", ex.getMessage());
-            vehiculo = new VehiculoInfoDTO();
-        }
-
-        try {
-            byte[] pdfBytes = ContratoCreditoPdfUtil.generarPdfContrato(
-                contrato,
-                persona,
-                vehiculo,
-                bancoProperties.getNombre(),
-                bancoProperties.getDireccion(),
-                bancoProperties.getTelefono(),
-                bancoProperties.getEmail(),
-                bancoProperties.getRepresentante(),
-                bancoProperties.getCedulaRepresentante()
-            );
+                byte[] pdfBytes = service.generarPdfContrato(id, contrato);
             ByteArrayResource resource = new ByteArrayResource(pdfBytes);
             return ResponseEntity.ok()
                 .contentLength(pdfBytes.length)
@@ -215,26 +137,16 @@ public class ContratoCreditoController {
     public ResponseEntity<Page<ContratoCreditoDTO>> listWithFilters(
         @Parameter(description = "Estado del contrato") @RequestParam(required = false) ContratoCreditoEstado estado,
         @Parameter(description = "Número de contrato core (búsqueda parcial)") @RequestParam(required = false) String numeroContrato,
-        @Parameter(description = "ID de solicitud") @RequestParam(required = false) Long idSolicitud,
+        @Parameter(description = "Número de solicitud") @RequestParam(required = false) String numeroSolicitud,
         @Parameter(description = "Página", example = "0") @RequestParam(defaultValue = "0") int page,
         @Parameter(description = "Tamaño de página", example = "20") @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<ContratoCreditoDTO> result = service.findContratosConFiltros(estado, numeroContrato, idSolicitud, pageable);
+        Page<ContratoCreditoDTO> result = service.findContratosConFiltros(estado, numeroContrato, numeroSolicitud, pageable);
         log.info("Consulta contratos: encontrados {} resultados.", result.getTotalElements());
         return ResponseEntity.ok(result);
     }
 
-    @Operation(summary = "Verifica si existe un contrato para una solicitud")
-    @GetMapping("/existe/solicitud/{idSolicitud}")
-    public ResponseEntity<Boolean> existsBySolicitud(
-        @Parameter(description = "ID de la solicitud", required = true)
-        @PathVariable Long idSolicitud) {
-        log.debug("Verificando existencia de contrato para solicitud {}", idSolicitud);
-        boolean existe = service.existePorSolicitud(idSolicitud);
-        log.info("Existencia de contrato para solicitud {}: {}", idSolicitud, existe);
-        return ResponseEntity.ok(existe);
-    }
 
     // === PAGARE (Integrados) ===
 
@@ -311,90 +223,50 @@ public ResponseEntity<Boolean> existenPagaresPorContrato(@PathVariable Long idCo
         PagareDTO pagare = service.getPagareByContratoAndCuota(idContratoCredito, numeroCuota);
         ContratoCreditoDTO contrato = service.getContratoCreditoById(idContratoCredito);
 
-        // Intentar obtener datos reales del deudor desde la solicitud asociada
+        // Obtener datos del cliente usando OriginacionClient y ClientesClient
         String tipoIdentificacion = null;
         String numeroIdentificacion = null;
         String nombreCliente = null;
         String correoCliente = null;
-        
+
         try {
-            if (contrato.getIdSolicitud() != null) {
-                log.debug("Obteniendo datos de solicitud para idSolicitud={}", contrato.getIdSolicitud());
-                
-                // Intentar obtener la solicitud completa con datos del cliente
-                com.banquito.Documentacion.util.dto.SolicitudCompletaDTO solicitudCompleta = null;
-                try {
-                    solicitudCompleta = solicitudCreditoClient.obtenerSolicitudCompleta(contrato.getIdSolicitud());
-                    log.debug("Solicitud completa obtenida exitosamente");
-                } catch (Exception ex) {
-                    log.warn("No se pudo obtener solicitud completa para idSolicitud={}: {}", contrato.getIdSolicitud(), ex.getMessage());
-                }
-                
-                if (solicitudCompleta != null) {
-                    // Usar datos del cliente de la solicitud completa
-                    tipoIdentificacion = solicitudCompleta.getTipoIdentificacionCliente();
-                    numeroIdentificacion = solicitudCompleta.getNumeroIdentificacionCliente();
-                    nombreCliente = solicitudCompleta.getNombreCliente();
-                    correoCliente = solicitudCompleta.getCorreoCliente();
-                    log.debug("Datos del cliente obtenidos de solicitud completa: {} - {}", tipoIdentificacion, numeroIdentificacion);
-                } else {
-                    // Fallback: usar resumen de solicitud si no se puede obtener la completa
-                    log.debug("Intentando obtener resumen de solicitud como fallback");
-                    com.banquito.Documentacion.util.dto.SolicitudResumenDTO resumen = null;
-                    try {
-                        resumen = vehiculoFeignClient.obtenerResumenSolicitud(contrato.getIdSolicitud());
-                    } catch (Exception ex) {
-                        log.warn("No se pudo obtener resumen de solicitud para idSolicitud={}: {}", contrato.getIdSolicitud(), ex.getMessage());
-                    }
-                    if (resumen != null) {
-                        tipoIdentificacion = "CEDULA"; // Valor por defecto si no está disponible
-                        numeroIdentificacion = resumen.getCedulaCliente();
-                        nombreCliente = resumen.getNombresCliente();
-                        correoCliente = resumen.getCorreoCliente();
-                        log.debug("Datos del cliente obtenidos de resumen de solicitud: {}", numeroIdentificacion);
-                    }
-                }
+            var detalle = originacionClient.obtenerDetalle(contrato.getNumeroSolicitud());
+            if (detalle != null) {
+                tipoIdentificacion = "CEDULA";
+                numeroIdentificacion = detalle.getCedulaSolicitante();
+                // nombreCliente y correoCliente se pueden obtener de ClientesClient
             }
         } catch (Exception ex) {
-            log.warn("Error al obtener datos de solicitud para el pagaré: {}", ex.getMessage());
+            log.warn("No se pudo obtener el detalle de la solicitud para numeroSolicitud={}: {}", contrato.getNumeroSolicitud(), ex.getMessage());
         }
 
-        // Validar que se obtuvieron datos mínimos necesarios
         if (tipoIdentificacion == null || numeroIdentificacion == null) {
-            log.warn("No se pudieron obtener datos de identificación del cliente para el pagaré. Usando valores por defecto.");
             tipoIdentificacion = "CEDULA";
-            numeroIdentificacion = "0000000000"; // Número genérico que indica error en obtención de datos
+            numeroIdentificacion = "0000000000";
             nombreCliente = "CLIENTE NO IDENTIFICADO";
         }
 
-        PersonaInfoDTO persona = null;
-        boolean datosPersonaFeign = false;
-        
-        // Intentar obtener datos adicionales del servicio de personas
+        PersonaInfoDTO persona = new PersonaInfoDTO();
         try {
-            log.debug("Intentando obtener datos de persona desde servicio externo: {} - {}", tipoIdentificacion, numeroIdentificacion);
-            persona = personaFeignClient.obtenerPersonaPorIdentificacion(tipoIdentificacion, numeroIdentificacion);
-            if (persona != null && persona.getNombre() != null && !persona.getNombre().isEmpty()) {
-                datosPersonaFeign = true;
-                log.info("Datos de persona obtenidos exitosamente desde servicio externo: {}", persona.getNombre());
+            var personaResp = clientesClient.consultarPersonaPorIdentificacion(tipoIdentificacion, numeroIdentificacion);
+            if (personaResp != null) {
+                persona.setTipoIdentificacion(personaResp.getTipoIdentificacion());
+                persona.setNumeroIdentificacion(personaResp.getNumeroIdentificacion());
+                persona.setNombre(personaResp.getNombres());
+                persona.setCorreoElectronico(personaResp.getCorreoElectronico());
+                // Completa otros campos si es necesario
+            } else {
+                persona.setTipoIdentificacion(tipoIdentificacion);
+                persona.setNumeroIdentificacion(numeroIdentificacion);
+                persona.setNombre(nombreCliente != null ? nombreCliente : "CLIENTE NO IDENTIFICADO");
+                persona.setCorreoElectronico(correoCliente);
             }
         } catch (Exception ex) {
-            log.warn("Error al obtener datos de persona desde servicio externo: {}", ex.getMessage());
-        }
-
-        // Si no se pudieron obtener datos del servicio de personas, crear persona con datos disponibles
-        if (persona == null || !datosPersonaFeign) {
-            log.debug("Creando PersonaInfoDTO con datos disponibles de la solicitud");
-            persona = new PersonaInfoDTO();
-            persona.setNombre(nombreCliente != null ? nombreCliente : "CLIENTE NO IDENTIFICADO");
+            log.warn("Error al conectar con el servicio de persona (tipo={}, numero={}): {}", tipoIdentificacion, numeroIdentificacion, ex.getMessage());
             persona.setTipoIdentificacion(tipoIdentificacion);
             persona.setNumeroIdentificacion(numeroIdentificacion);
+            persona.setNombre(nombreCliente != null ? nombreCliente : "Error al obtener datos");
             persona.setCorreoElectronico(correoCliente);
-            // Campos adicionales con valores por defecto
-            persona.setGenero("NO_ESPECIFICADO");
-            persona.setFechaNacimiento("N/A");
-            persona.setEstadoCivil("NO_ESPECIFICADO");
-            persona.setNivelEstudio("NO_ESPECIFICADO");
         }
 
         try {
@@ -437,86 +309,47 @@ public ResponseEntity<Boolean> existenPagaresPorContrato(@PathVariable Long idCo
         PagareDTO pagare = service.getPagareById(id);
         ContratoCreditoDTO contrato = service.getContratoCreditoById(pagare.getIdContratoCredito());
 
-        // Intentar obtener datos reales del deudor desde la solicitud asociada
+        // Obtener datos del cliente usando OriginacionClient y ClientesClient
         String tipoIdentificacion = null;
         String numeroIdentificacion = null;
         String nombreCliente = null;
         String correoCliente = null;
-        
+
         try {
-            if (contrato.getIdSolicitud() != null) {
-                log.debug("Obteniendo datos de solicitud para idSolicitud={}", contrato.getIdSolicitud());
-                
-                // Intentar obtener la solicitud completa con datos del cliente
-                com.banquito.Documentacion.util.dto.SolicitudCompletaDTO solicitudCompleta = null;
-                try {
-                    solicitudCompleta = solicitudCreditoClient.obtenerSolicitudCompleta(contrato.getIdSolicitud());
-                    log.debug("Solicitud completa obtenida exitosamente");
-                } catch (Exception ex) {
-                    log.warn("No se pudo obtener solicitud completa para idSolicitud={}: {}", contrato.getIdSolicitud(), ex.getMessage());
-                }
-                
-                if (solicitudCompleta != null) {
-                    // Usar datos del cliente de la solicitud completa
-                    tipoIdentificacion = solicitudCompleta.getTipoIdentificacionCliente();
-                    numeroIdentificacion = solicitudCompleta.getNumeroIdentificacionCliente();
-                    nombreCliente = solicitudCompleta.getNombreCliente();
-                    correoCliente = solicitudCompleta.getCorreoCliente();
-                    log.debug("Datos del cliente obtenidos de solicitud completa: {} - {}", tipoIdentificacion, numeroIdentificacion);
-                } else {
-                    // Fallback: usar resumen de solicitud si no se puede obtener la completa
-                    log.debug("Intentando obtener resumen de solicitud como fallback");
-                    com.banquito.Documentacion.util.dto.SolicitudResumenDTO resumen = null;
-                    try {
-                        resumen = vehiculoFeignClient.obtenerResumenSolicitud(contrato.getIdSolicitud());
-                    } catch (Exception ex) {
-                        log.warn("No se pudo obtener resumen de solicitud para idSolicitud={}: {}", contrato.getIdSolicitud(), ex.getMessage());
-                    }
-                    if (resumen != null) {
-                        tipoIdentificacion = "CEDULA"; // Valor por defecto si no está disponible
-                        numeroIdentificacion = resumen.getCedulaCliente();
-                        nombreCliente = resumen.getNombresCliente();
-                        correoCliente = resumen.getCorreoCliente();
-                        log.debug("Datos del cliente obtenidos de resumen de solicitud: {}", numeroIdentificacion);
-                    }
-                }
+            var detalle = originacionClient.obtenerDetalle(contrato.getNumeroSolicitud());
+            if (detalle != null) {
+                tipoIdentificacion = "CEDULA";
+                numeroIdentificacion = detalle.getCedulaSolicitante();
             }
         } catch (Exception ex) {
-            log.warn("Error al obtener datos de solicitud para el contrato: {}", ex.getMessage());
+            log.warn("No se pudo obtener el detalle de la solicitud para numeroSolicitud={}: {}", contrato.getNumeroSolicitud(), ex.getMessage());
         }
 
-        // Validar que se obtuvieron datos mínimos necesarios
         if (tipoIdentificacion == null || numeroIdentificacion == null) {
-            log.warn("No se pudieron obtener datos de identificación del cliente para el pagaré. Usando valores por defecto.");
             tipoIdentificacion = "CEDULA";
-            numeroIdentificacion = "0000000000"; // Número genérico que indica error en obtención de datos
+            numeroIdentificacion = "0000000000";
             nombreCliente = "CLIENTE NO IDENTIFICADO";
         }
 
-        PersonaInfoDTO persona = null;
-        boolean datosPersonaFeign = false;
-        
-        // Intentar obtener datos adicionales del servicio de personas
+        PersonaInfoDTO persona = new PersonaInfoDTO();
         try {
-            log.debug("Intentando obtener datos de persona desde servicio externo: {} - {}", tipoIdentificacion, numeroIdentificacion);
-            persona = personaFeignClient.obtenerPersonaPorIdentificacion(tipoIdentificacion, numeroIdentificacion);
-            if (persona != null && persona.getNombre() != null && !persona.getNombre().isEmpty()) {
-                log.debug("Datos de persona obtenidos exitosamente desde servicio externo: {}", persona.getNombre());
-                datosPersonaFeign = true;
+            var personaResp = clientesClient.consultarPersonaPorIdentificacion(tipoIdentificacion, numeroIdentificacion);
+            if (personaResp != null) {
+                persona.setTipoIdentificacion(personaResp.getTipoIdentificacion());
+                persona.setNumeroIdentificacion(personaResp.getNumeroIdentificacion());
+                persona.setNombre(personaResp.getNombres());
+                persona.setCorreoElectronico(personaResp.getCorreoElectronico());
             } else {
-                log.debug("Servicio de personas retornó datos vacíos o nulos");
+                persona.setTipoIdentificacion(tipoIdentificacion);
+                persona.setNumeroIdentificacion(numeroIdentificacion);
+                persona.setNombre(nombreCliente != null ? nombreCliente : "N/A");
+                persona.setCorreoElectronico(correoCliente);
             }
         } catch (Exception ex) {
-            log.warn("No se pudo conectar al servicio externo de persona: {}", ex.getMessage());
-        }
-        
-        // Si no se pudo obtener por Feign, usar datos de la solicitud
-        if (!datosPersonaFeign) {
-            log.debug("Usando datos de solicitud para crear PersonaInfoDTO");
-            persona = new PersonaInfoDTO();
+            log.warn("Error al conectar con el servicio de persona (tipo={}, numero={}): {}", tipoIdentificacion, numeroIdentificacion, ex.getMessage());
             persona.setTipoIdentificacion(tipoIdentificacion);
             persona.setNumeroIdentificacion(numeroIdentificacion);
-            persona.setNombre(nombreCliente != null ? nombreCliente : "N/A");
+            persona.setNombre(nombreCliente != null ? nombreCliente : "Error al obtener datos");
             persona.setCorreoElectronico(correoCliente);
         }
 

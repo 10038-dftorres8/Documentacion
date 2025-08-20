@@ -190,7 +190,7 @@ public class DocumentoService {
         }
         String idCliente = clientes.get(0).getId();
 
-
+        /*
         CrearPrestamoRequest creq = new CrearPrestamoRequest(
                 idCliente,
                 det.getIdPrestamo(),
@@ -199,8 +199,7 @@ public class DocumentoService {
 
         // c) llamas al cliente Feign que expone el POST /prestamos
         prestamoClient.crearPrestamo(creq);
-
-        /*
+         */
         // b) crear DTO para la cola y enviar a ActiveMQ en lugar de llamada directa
         CrearPrestamoQueueDTO queueDTO = new CrearPrestamoQueueDTO(
                 idCliente,
@@ -210,7 +209,7 @@ public class DocumentoService {
 
         // c) llamas al cliente Feign que expone el POST /prestamos
         prestamoQueueService.enviarSolicitudPrestamo(queueDTO);
-         */
+
     }
 
     public void cargarTodosYMarcar(

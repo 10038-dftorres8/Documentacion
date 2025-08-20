@@ -6,8 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import com.banquito.Documentacion.dto.DetalleSolicitudResponseDTO;
-import com.banquito.Documentacion.dto.SolicitudResumenDTO;
-import com.banquito.Documentacion.util.dto.SolicitudCompletaDTO;
+
 
 @FeignClient(name = "originacionClient", url = "${originacion.service.url}/v1/solicitudes")
 public interface OriginacionClient {
